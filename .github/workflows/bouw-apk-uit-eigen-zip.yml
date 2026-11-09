@@ -68,17 +68,10 @@ jobs:
           p.write_text(s)
           p=base/'src/main/java/nl/nancyswereld/mijnspotify/MainActivity.java'
           s=p.read_text()
-          old='''            final String scheme=uri.getScheme();
-            if ("http".equalsIgnoreCase(scheme)||"https".equalsIgnoreCase(scheme)||"market".equalsIgnoreCase(scheme)) {'''
-          new='''            final String scheme=uri.getScheme();
-            if ("intent".equalsIgnoreCase(scheme) && "music".equalsIgnoreCase(uri.getHost())) {
-                if ("/choose".equals(uri.getPath())) openTreePicker();
-                else if ("/scan".equals(uri.getPath())) requestDeviceAudio();
-                return true;
-            }
-            if ("http".equalsIgnoreCase(scheme)||"https".equalsIgnoreCase(scheme)||"market".equalsIgnoreCase(scheme)) {'''
-          assert s.count(old)==1, 'Android intent-afhandeling niet gevonden in originele bron'
-          p.write_text(s.replace(old,new,1))
+          needle='            final String scheme=uri.getScheme();\n'
+          addition='''            if ("intent".equalsIgnoreCase(scheme) && "music".equalsIgnoreCase(uri.getHost())) {\n                if ("/choose".equals(uri.getPath())) openTreePicker();\n                else if ("/scan".equals(uri.getPath())) requestDeviceAudio();\n                return true;\n            }\n'''
+          assert s.count(needle)==1, 'Android scheme-regel niet gevonden in originele bron'
+          p.write_text(s.replace(needle,needle+addition,1))
           PYBUILD
       - name: Controleer JavaScript uit de originele ZIP
         shell: bash
