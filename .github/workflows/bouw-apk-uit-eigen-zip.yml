@@ -17,19 +17,17 @@ jobs:
     steps:
       - name: Haal uitsluitend de bestanden van deze nieuwe repository op
         uses: actions/checkout@v4
-
       - name: Herstel en controleer de EIGEN ZIP, zonder andere code te gebruiken
         shell: bash
         run: |
           set -euo pipefail
           cat Mijn_Muziek_Originele_ZIP.part-{00..02} > Mijn_Muziek_Origineel.zip
-          printf '%s  %s\n' '96088b5da7b539be24167d4654625fc4df592f8d4bc66b939f4224bc89e4bd18' 'Mijn_Muziek_Origineel.zip' | sha256sum -c -
+          printf '%s  %s\\n' '96088b5da7b539be24167d4654625fc4df592f8d4bc66b939f4224bc89e4bd18' 'Mijn_Muziek_Origineel.zip' | sha256sum -c -
           mkdir -p origineel
           unzip -q Mijn_Muziek_Origineel.zip -d origineel
           test -f origineel/Mijn_Muziek_Mobiel_PC/android-native/app/build.gradle
           test -f origineel/Mijn_Muziek_Mobiel_PC/android-native/app/src/main/assets/www/index.html
           test -f origineel/Mijn_Muziek_Mobiel_PC/Mijn_Muziek_V4_50_TELEFOON_PC_DIRECT_OPENEN.html
-
       - name: Android Java 17 / Gradle 8.9
         uses: actions/setup-java@v4
         with:
@@ -45,8 +43,7 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
-
-      - name: Alleen Android-buildinstellingen repareren en nieuwe zelfstandige appnaam gebruiken
+      - name: Alleen noodzakelijke Android-buildconfiguratie instellen
         shell: bash
         run: |
           set -euo pipefail
@@ -62,8 +59,7 @@ jobs:
           s=s.replace('versionCode 445','versionCode 451')
           s=s.replace("versionName '4.45'", "versionName '4.50.1'")
           assert "implementation files('libs/gson-2.10.1.jar')" in s
-          # AndroidX Browser is imported by the original ZIP code, but absent in its Gradle dependency list.
-          s=s.replace("implementation files('libs/gson-2.10.1.jar')", "implementation files('libs/gson-2.10.1.jar')\n    implementation 'androidx.browser:browser:1.8.0'")
+          s=s.replace("implementation files('libs/gson-2.10.1.jar')", "implementation files('libs/gson-2.10.1.jar')\\n    implementation 'androidx.browser:browser:1.8.0'")
           p.write_text(s)
           p=base/'src/main/AndroidManifest.xml'
           s=p.read_text()
@@ -72,72 +68,35 @@ jobs:
           s=s.replace('android:name=".MainActivity"','android:name="nl.nancyswereld.mijnspotify.MainActivity"')
           s=s.replace('android:name=".GlobalAudioService"','android:name="nl.nancyswereld.mijnspotify.GlobalAudioService"')
           p.write_text(s)
-          # The Android app ID is changed only for the new installation, so the
-          # original bridge must accept the matching package in its handshake.
-          p=base/'src/main/assets/www/native-transport.js'
-          s=p.read_text()
-          old="['nl.nancyswereld.mijnspotify',"
-          new="['nl.nancyswereld.nancysmuziek','nl.nancyswereld.mijnspotify',"
-          assert s.count(old)==1, 'Verwachte Android-pakketlijst niet gevonden'
-          p.write_text(s.replace(old,new,1))
-          # If the user taps Mappen before the handshake finishes, call the
-          # already provided Android JavaScript bridge; never load intent://
-          # as a WebView page.
-          p=base/'src/main/assets/www/app.js'
-          s=p.read_text()
-          old=" location.href='intent://music/'+path+'#Intent;scheme='+pkg+';package='+pkg+';end';"
-          new=" if(window.AndroidNative&&typeof window.AndroidNative.postMessage==='function'){window.AndroidNative.postMessage(JSON.stringify({type:mode==='device'?'music-scan-device':'music-pick-folder'}));return true;}\n"+old
-          assert s.count(old)==1, 'Verwachte mapkiezer route niet gevonden'
-          p.write_text(s.replace(old,new,1))
-          # In the unlikely case the JS bridge is missing, WebView itself
-          # handles only the two Android music picker routes.
-          p=base/'src/main/java/nl/nancyswereld/mijnspotify/MainActivity.java'
-          s=p.read_text()
-          old='''            final String scheme=uri.getScheme();
-            if ("http".equalsIgnoreCase(scheme)||"https".equalsIgnoreCase(scheme)||"market".equalsIgnoreCase(scheme)) {'''
-          new='''            final String scheme=uri.getScheme();
-            if ("intent".equalsIgnoreCase(scheme) && "music".equalsIgnoreCase(uri.getHost())) {
-                if ("/choose".equals(uri.getPath())) openTreePicker();
-                else if ("/scan".equals(uri.getPath())) requestDeviceAudio();
-                return true;
-            }
-            if ("http".equalsIgnoreCase(scheme)||"https".equalsIgnoreCase(scheme)||"market".equalsIgnoreCase(scheme)) {'''
-          assert s.count(old)==1, 'Verwachte WebView-navigatie niet gevonden'
-          p.write_text(s.replace(old,new,1))
           PYBUILD
-
       - name: Controleer JavaScript uit de originele ZIP
         shell: bash
         run: |
           set -euo pipefail
           find origineel/Mijn_Muziek_Mobiel_PC/android-native/app/src/main/assets/www -type f -name '*.js' -print0 | xargs -0 -n1 node --check
-
       - name: Bouw volledig NIEUWE APK uit alleen die ZIP
         working-directory: origineel/Mijn_Muziek_Mobiel_PC/android-native
         run: gradle --no-daemon --stacktrace :app:assembleDebug
-
       - name: Herkenbare APK en computerbestand verzamelen
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p publicatie
-          cp origineel/Mijn_Muziek_Mobiel_PC/android-native/app/build/outputs/apk/debug/app-debug.apk publicatie/Nancys_Muziek_Android_V4_50_1_MAPPEN_HERSTELD.apk
+          cp origineel/Mijn_Muziek_Mobiel_PC/android-native/app/build/outputs/apk/debug/app-debug.apk publicatie/Nancys_Muziek_Android_V4_50_1_ORIGINELE_ZIP.apk
           cp origineel/Mijn_Muziek_Mobiel_PC/Mijn_Muziek_V4_50_TELEFOON_PC_DIRECT_OPENEN.html publicatie/Mijn_Muziek_Computer_V4_50.html
           sha256sum publicatie/* > publicatie/SHA256.txt
-
       - name: Maak openbare GitHub Release met ECHTE APK
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
-          gh release create 'v4.50.1-mappen-hersteld' publicatie/* \
-            --title "Nancy's Muziek V4.50.1 — Mappen hersteld, originele ZIP" \
-            --notes "Nieuwe APK uitsluitend uit de aangeleverde originele ZIP. Alleen Android-mapkiezer/brug gerepareerd. Vormgeving en overige muziekfuncties niet gewijzigd. Dit is een debug-build met nieuwe ondertekening; de vorige Nancy's Muziek-installatie kan eerst verwijderd moeten worden. Op het toestel nog niet gevalideerd."
-
+          gh release create 'v4.50.1-originele-zip' publicatie/* \\
+            --title "Nancy's Muziek V4.50.1 — originele ZIP" \\
+            --notes "Nieuwe APK uitsluitend uit de aangeleverde originele ZIP. Alleen noodzakelijke Android-buildconfiguratie en pakketidentiteit ingesteld; modulebestanden zelf zijn niet gewijzigd. De APK is een debug-build met nieuwe ondertekening."
       - name: APK ook als GitHub Actions artifact bewaren
         uses: actions/upload-artifact@v4
         with:
-          name: Nancy-Muziek-V4-50-1-MAPPEN-HERSTELD-Uitsluitend-ZIP
+          name: Nancy-Muziek-V4-50-1-ORIGINELE-ZIP
           path: publicatie/
           if-no-files-found: error
