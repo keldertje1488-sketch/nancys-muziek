@@ -22,7 +22,7 @@ jobs:
         run: |
           set -euo pipefail
           cat Mijn_Muziek_Originele_ZIP.part-{00..02} > Mijn_Muziek_Origineel.zip
-          printf '%s  %s\\n' '96088b5da7b539be24167d4654625fc4df592f8d4bc66b939f4224bc89e4bd18' 'Mijn_Muziek_Origineel.zip' | sha256sum -c -
+          printf '%s  %s\n' '96088b5da7b539be24167d4654625fc4df592f8d4bc66b939f4224bc89e4bd18' 'Mijn_Muziek_Origineel.zip' | sha256sum -c -
           mkdir -p origineel
           unzip -q Mijn_Muziek_Origineel.zip -d origineel
           test -f origineel/Mijn_Muziek_Mobiel_PC/android-native/app/build.gradle
@@ -59,7 +59,7 @@ jobs:
           s=s.replace('versionCode 445','versionCode 451')
           s=s.replace("versionName '4.45'", "versionName '4.50.1'")
           assert "implementation files('libs/gson-2.10.1.jar')" in s
-          s=s.replace("implementation files('libs/gson-2.10.1.jar')", "implementation files('libs/gson-2.10.1.jar')\\n    implementation 'androidx.browser:browser:1.8.0'")
+          s=s.replace("implementation files('libs/gson-2.10.1.jar')", "implementation files('libs/gson-2.10.1.jar')\n    implementation 'androidx.browser:browser:1.8.0'")
           p.write_text(s)
           p=base/'src/main/AndroidManifest.xml'
           s=p.read_text()
@@ -91,8 +91,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          gh release create 'v4.50.1-originele-zip' publicatie/* \\
-            --title "Nancy's Muziek V4.50.1 — originele ZIP" \\
+          gh release create 'v4.50.1-originele-zip' publicatie/* \
+            --title "Nancy's Muziek V4.50.1 — originele ZIP" \
             --notes "Nieuwe APK uitsluitend uit de aangeleverde originele ZIP. Alleen noodzakelijke Android-buildconfiguratie en pakketidentiteit ingesteld; modulebestanden zelf zijn niet gewijzigd. De APK is een debug-build met nieuwe ondertekening."
       - name: APK ook als GitHub Actions artifact bewaren
         uses: actions/upload-artifact@v4
