@@ -59,8 +59,8 @@ jobs:
           assert 'versionCode 445' in s
           assert "versionName '4.45'" in s
           s=s.replace("applicationId 'nl.nancyswereld.mijnspotify'", "applicationId 'nl.nancyswereld.nancysmuziek'")
-          s=s.replace('versionCode 445','versionCode 450')
-          s=s.replace("versionName '4.45'", "versionName '4.50'")
+          s=s.replace('versionCode 445','versionCode 451')
+          s=s.replace("versionName '4.45'", "versionName '4.50.1'")
           assert "implementation files('libs/gson-2.10.1.jar')" in s
           # AndroidX Browser is imported by the original ZIP code, but absent in its Gradle dependency list.
           s=s.replace("implementation files('libs/gson-2.10.1.jar')", "implementation files('libs/gson-2.10.1.jar')\n    implementation 'androidx.browser:browser:1.8.0'")
@@ -72,6 +72,38 @@ jobs:
           s=s.replace('android:name=".MainActivity"','android:name="nl.nancyswereld.mijnspotify.MainActivity"')
           s=s.replace('android:name=".GlobalAudioService"','android:name="nl.nancyswereld.mijnspotify.GlobalAudioService"')
           p.write_text(s)
+          # The Android app ID is changed only for the new installation, so the
+          # original bridge must accept the matching package in its handshake.
+          p=base/'src/main/assets/www/native-transport.js'
+          s=p.read_text()
+          old="['nl.nancyswereld.mijnspotify',"
+          new="['nl.nancyswereld.nancysmuziek','nl.nancyswereld.mijnspotify',"
+          assert s.count(old)==1, 'Verwachte Android-pakketlijst niet gevonden'
+          p.write_text(s.replace(old,new,1))
+          # If the user taps Mappen before the handshake finishes, call the
+          # already provided Android JavaScript bridge; never load intent://
+          # as a WebView page.
+          p=base/'src/main/assets/www/app.js'
+          s=p.read_text()
+          old=" location.href='intent://music/'+path+'#Intent;scheme='+pkg+';package='+pkg+';end';"
+          new=" if(window.AndroidNative&&typeof window.AndroidNative.postMessage==='function'){window.AndroidNative.postMessage(JSON.stringify({type:mode==='device'?'music-scan-device':'music-pick-folder'}));return true;}\n"+old
+          assert s.count(old)==1, 'Verwachte mapkiezer route niet gevonden'
+          p.write_text(s.replace(old,new,1))
+          # In the unlikely case the JS bridge is missing, WebView itself
+          # handles only the two Android music picker routes.
+          p=base/'src/main/java/nl/nancyswereld/mijnspotify/MainActivity.java'
+          s=p.read_text()
+          old='''            final String scheme=uri.getScheme();
+            if ("http".equalsIgnoreCase(scheme)||"https".equalsIgnoreCase(scheme)||"market".equalsIgnoreCase(scheme)) {'''
+          new='''            final String scheme=uri.getScheme();
+            if ("intent".equalsIgnoreCase(scheme) && "music".equalsIgnoreCase(uri.getHost())) {
+                if ("/choose".equals(uri.getPath())) openTreePicker();
+                else if ("/scan".equals(uri.getPath())) requestDeviceAudio();
+                return true;
+            }
+            if ("http".equalsIgnoreCase(scheme)||"https".equalsIgnoreCase(scheme)||"market".equalsIgnoreCase(scheme)) {'''
+          assert s.count(old)==1, 'Verwachte WebView-navigatie niet gevonden'
+          p.write_text(s.replace(old,new,1))
           PYBUILD
 
       - name: Controleer JavaScript uit de originele ZIP
@@ -89,7 +121,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p publicatie
-          cp origineel/Mijn_Muziek_Mobiel_PC/android-native/app/build/outputs/apk/debug/app-debug.apk publicatie/Nancys_Muziek_Android_V4_50_VAN_ORIGINELE_ZIP.apk
+          cp origineel/Mijn_Muziek_Mobiel_PC/android-native/app/build/outputs/apk/debug/app-debug.apk publicatie/Nancys_Muziek_Android_V4_50_1_MAPPEN_HERSTELD.apk
           cp origineel/Mijn_Muziek_Mobiel_PC/Mijn_Muziek_V4_50_TELEFOON_PC_DIRECT_OPENEN.html publicatie/Mijn_Muziek_Computer_V4_50.html
           sha256sum publicatie/* > publicatie/SHA256.txt
 
@@ -99,13 +131,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          gh release create 'v4.50-zip-only' publicatie/* \
-            --title "Nancy's Muziek V4.50 — gebouwd uit originele mobiele/computer-ZIP" \
-            --notes "Nieuwe Android-APK en computer-HTML, volledig uit de aangeleverde ZIP. Geen oude APK of oude GitHub-code gebruikt. Nieuwe Android-app-ID voorkomt botsing met de oude kapotte installatie. APK is een door GitHub Actions ondertekende debug-build; op een fysiek toestel nog niet getest."
+          gh release create 'v4.50.1-mappen-hersteld' publicatie/* \
+            --title "Nancy's Muziek V4.50.1 — Mappen hersteld, originele ZIP" \
+            --notes "Nieuwe APK uitsluitend uit de aangeleverde originele ZIP. Alleen Android-mapkiezer/brug gerepareerd. Vormgeving en overige muziekfuncties niet gewijzigd. Dit is een debug-build met nieuwe ondertekening; de vorige Nancy's Muziek-installatie kan eerst verwijderd moeten worden. Op het toestel nog niet gevalideerd."
 
       - name: APK ook als GitHub Actions artifact bewaren
         uses: actions/upload-artifact@v4
         with:
-          name: Nancy-Muziek-V4-50-APK-Uitsluitend-ZIP
+          name: Nancy-Muziek-V4-50-1-MAPPEN-HERSTELD-Uitsluitend-ZIP
           path: publicatie/
           if-no-files-found: error
