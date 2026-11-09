@@ -6,10 +6,8 @@ on:
     paths:
       - 'Mijn_Muziek_Originele_ZIP.part-*'
       - '.github/workflows/bouw-apk-uit-eigen-zip.yml'
-
 permissions:
   contents: write
-
 jobs:
   uitsluitend-eigen-zip:
     runs-on: ubuntu-latest
@@ -43,7 +41,7 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
-      - name: Alleen noodzakelijke Android-buildconfiguratie instellen
+      - name: Android-buildconfiguratie en mapkiezer-afhandeling instellen
         shell: bash
         run: |
           set -euo pipefail
@@ -56,8 +54,8 @@ jobs:
           assert 'versionCode 445' in s
           assert "versionName '4.45'" in s
           s=s.replace("applicationId 'nl.nancyswereld.mijnspotify'", "applicationId 'nl.nancyswereld.nancysmuziek'")
-          s=s.replace('versionCode 445','versionCode 451')
-          s=s.replace("versionName '4.45'", "versionName '4.50.1'")
+          s=s.replace('versionCode 445','versionCode 452')
+          s=s.replace("versionName '4.45'", "versionName '4.50.2'")
           assert "implementation files('libs/gson-2.10.1.jar')" in s
           s=s.replace("implementation files('libs/gson-2.10.1.jar')", "implementation files('libs/gson-2.10.1.jar')\n    implementation 'androidx.browser:browser:1.8.0'")
           p.write_text(s)
@@ -68,6 +66,19 @@ jobs:
           s=s.replace('android:name=".MainActivity"','android:name="nl.nancyswereld.mijnspotify.MainActivity"')
           s=s.replace('android:name=".GlobalAudioService"','android:name="nl.nancyswereld.mijnspotify.GlobalAudioService"')
           p.write_text(s)
+          p=base/'src/main/java/nl/nancyswereld/mijnspotify/MainActivity.java'
+          s=p.read_text()
+          old='''            final String scheme=uri.getScheme();
+            if ("http".equalsIgnoreCase(scheme)||"https".equalsIgnoreCase(scheme)||"market".equalsIgnoreCase(scheme)) {'''
+          new='''            final String scheme=uri.getScheme();
+            if ("intent".equalsIgnoreCase(scheme) && "music".equalsIgnoreCase(uri.getHost())) {
+                if ("/choose".equals(uri.getPath())) openTreePicker();
+                else if ("/scan".equals(uri.getPath())) requestDeviceAudio();
+                return true;
+            }
+            if ("http".equalsIgnoreCase(scheme)||"https".equalsIgnoreCase(scheme)||"market".equalsIgnoreCase(scheme)) {'''
+          assert s.count(old)==1, 'Android intent-afhandeling niet gevonden in originele bron'
+          p.write_text(s.replace(old,new,1))
           PYBUILD
       - name: Controleer JavaScript uit de originele ZIP
         shell: bash
@@ -77,12 +88,12 @@ jobs:
       - name: Bouw volledig NIEUWE APK uit alleen die ZIP
         working-directory: origineel/Mijn_Muziek_Mobiel_PC/android-native
         run: gradle --no-daemon --stacktrace :app:assembleDebug
-      - name: Herkenbare APK en computerbestand verzamelen
+      - name: APK verzamelen
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p publicatie
-          cp origineel/Mijn_Muziek_Mobiel_PC/android-native/app/build/outputs/apk/debug/app-debug.apk publicatie/Nancys_Muziek_Android_V4_50_1_ORIGINELE_ZIP.apk
+          cp origineel/Mijn_Muziek_Mobiel_PC/android-native/app/build/outputs/apk/debug/app-debug.apk publicatie/Nancys_Muziek_Android_V4_50_2_MAPPEN_GEREPAREERD.apk
           cp origineel/Mijn_Muziek_Mobiel_PC/Mijn_Muziek_V4_50_TELEFOON_PC_DIRECT_OPENEN.html publicatie/Mijn_Muziek_Computer_V4_50.html
           sha256sum publicatie/* > publicatie/SHA256.txt
       - name: Maak openbare GitHub Release met ECHTE APK
@@ -91,12 +102,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          gh release create 'v4.50.1-originele-zip' publicatie/* \
-            --title "Nancy's Muziek V4.50.1 — originele ZIP" \
-            --notes "Nieuwe APK uitsluitend uit de aangeleverde originele ZIP. Alleen noodzakelijke Android-buildconfiguratie en pakketidentiteit ingesteld; modulebestanden zelf zijn niet gewijzigd. De APK is een debug-build met nieuwe ondertekening."
+          gh release create 'v4.50.2-mappen-gerepareerd' publicatie/* \
+            --title "Nancy's Muziek V4.50.2 — Mappen gerepareerd" \
+            --notes "Nieuwe APK uitsluitend uit de aangeleverde originele ZIP. De Android-wrapper onderschept intent://music/choose en opent de bestaande systeemmapkiezer. De module-interface en muziekfuncties zijn niet gewijzigd. Debug-build met nieuwe ondertekening."
       - name: APK ook als GitHub Actions artifact bewaren
         uses: actions/upload-artifact@v4
         with:
-          name: Nancy-Muziek-V4-50-1-ORIGINELE-ZIP
+          name: Nancy-Muziek-V4-50-2-MAPPEN-GEREPAREERD
           path: publicatie/
           if-no-files-found: error
