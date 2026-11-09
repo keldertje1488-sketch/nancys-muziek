@@ -50,7 +50,7 @@ jobs:
           assert "applicationId 'nl.nancyswereld.mijnspotify'" in s
           assert 'versionCode 445' in s and "versionName '4.45'" in s
           s=s.replace("applicationId 'nl.nancyswereld.mijnspotify'", "applicationId 'nl.nancyswereld.nancysmuziek'")
-          s=s.replace('versionCode 445','versionCode 453').replace("versionName '4.45'", "versionName '4.50.3'")
+          s=s.replace('versionCode 445','versionCode 454').replace("versionName '4.45'", "versionName '4.50.4'")
           assert "implementation files('libs/gson-2.10.1.jar')" in s
           s=s.replace("implementation files('libs/gson-2.10.1.jar')", "implementation files('libs/gson-2.10.1.jar')\n    implementation 'androidx.browser:browser:1.8.0'")
           p.write_text(s)
@@ -65,6 +65,11 @@ jobs:
           p.write_text(s.replace(needle,needle+addition,1))
           p=base/'src/main/assets/www/native-transport.js'; s=p.read_text()
           old="['nl.nancyswereld.mijnspotify',"; new="['nl.nancyswereld.nancysmuziek','nl.nancyswereld.mijnspotify',"
+          assert s.count(old)==1
+          p.write_text(s.replace(old,new,1))
+          p=base/'src/main/assets/www/index.html'; s=p.read_text()
+          old="if(data.version===2&&data.nonce===nonce&&['nl.nancyswereld.mijnspotify',"
+          new="if([2,3].includes(data.version)&&data.nonce===nonce&&['nl.nancyswereld.nancysmuziek','nl.nancyswereld.mijnspotify',"
           assert s.count(old)==1
           p.write_text(s.replace(old,new,1))
           PYBUILD
@@ -82,12 +87,12 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p publicatie
-          cp origineel/Mijn_Muziek_Mobiel_PC/android-native/app/build/outputs/apk/debug/app-debug.apk publicatie/Nancys_Muziek_Android_V4_50_3_MAPPEN_GEREPAREERD.apk
+          cp origineel/Mijn_Muziek_Mobiel_PC/android-native/app/build/outputs/apk/debug/app-debug.apk publicatie/Nancys_Muziek_Android_V4_50_4_MAPPEN_GEREPAREERD.apk
           cp origineel/Mijn_Muziek_Mobiel_PC/Mijn_Muziek_V4_50_TELEFOON_PC_DIRECT_OPENEN.html publicatie/Mijn_Muziek_Computer_V4_50.html
           sha256sum publicatie/* > publicatie/SHA256.txt
-          gh release create 'v4.50.3-mappen-gerepareerd' publicatie/* --title "Nancy's Muziek V4.50.3 — Mappen gerepareerd" --notes "APK uitsluitend uit de aangeleverde originele ZIP. Mapkiezer en native handshake gerepareerd."
+          gh release create 'v4.50.4-mappen-gerepareerd' publicatie/* --title "Nancy's Muziek V4.50.4 — Mappen gerepareerd" --notes "APK uitsluitend uit de aangeleverde originele ZIP. Mapkiezer en native handshake gerepareerd."
       - uses: actions/upload-artifact@v4
         with:
-          name: Nancy-Muziek-V4-50-3-MAPPEN-GEREPAREERD
+          name: Nancy-Muziek-V4-50-4-MAPPEN-GEREPAREERD
           path: publicatie/
           if-no-files-found: error
